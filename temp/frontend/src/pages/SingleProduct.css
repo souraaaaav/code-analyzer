@@ -1,0 +1,28 @@
+/** @format */
+
+.rating {
+  display: inline-block;
+  font-size: 24px;
+}
+
+.rating .checked {
+  color: orange;
+}
+
+.rating .fa-star-half {
+  position: relative;
+  display: inline-block;
+}
+
+.rating .fa-star-half:before {
+  position: absolute;
+  content: '\f005';
+  color: #ccc;
+}
+
+.rating .fa-star-half:after {
+  position: absolute;
+  content: '\f089';
+  color: orange;
+  clip: rect(0, 0.5em, 1em, 0);
+}

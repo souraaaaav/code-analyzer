@@ -5,6 +5,7 @@ import ast
 import re
 import pandas as pd
 import shutil
+import time
 
 
 def clone_repo(git_url, clone_dir):
@@ -43,7 +44,7 @@ class MetricsCalculator(ast.NodeVisitor):
         self.max_depth = 0
         self.unique_words = set()
         self.words_pattern = re.compile(r'\b\w+\b')
-
+        self.class_times = {}
     def visit_ClassDef(self, node):
         if self.current_class is not None:
             self.save_class_metrics()
@@ -75,7 +76,7 @@ class MetricsCalculator(ast.NodeVisitor):
 
         # Reset unique words set for new class
         self.unique_words = set()
-
+        start_time = time.perf_counter()
         # Visit base classes to calculate DIT
         for base in node.bases:
             if isinstance(base, ast.Name):
@@ -83,9 +84,13 @@ class MetricsCalculator(ast.NodeVisitor):
                     self.current_metrics['dit'] = max(self.current_metrics['dit'], self.class_metrics[base.id]['dit'] + 1)
 
         self.generic_visit(node)
+
+        end_time = time.perf_counter()
+
+        self.class_times[self.current_class] = end_time - start_time
+
         self.save_class_metrics()
         self.current_class = None
-
     def visit_Import(self, node):
         if self.current_class:
             for alias in node.names:
@@ -265,6 +270,8 @@ class MetricsCalculator(ast.NodeVisitor):
         # Return the stored unique words quantity for each class
         return {cls: metrics['uniqueWordsQty'] for cls, metrics in self.class_metrics.items()}
 
+    def calculate_analysis_time(self):
+        return self.class_times
 
 def analyze_metrics_in_directory(directory='.'):
     print(f"\nAnalyzing Python files in directory: {directory}\n")
@@ -288,6 +295,7 @@ def analyze_metrics_in_directory(directory='.'):
     lcom_metrics = calculator.calculate_lcom()
     max_nested_blocks = calculator.calculate_max_nested_blocks()
     unique_words_qty = calculator.calculate_unique_words_qty()
+    class_times = calculator.calculate_analysis_time()
 
     data = []
     for cls, metrics in calculator.class_metrics.items():
@@ -308,8 +316,9 @@ def analyze_metrics_in_directory(directory='.'):
             'Assignments Quantity': metrics['assignments_qty'],
             'Math Operations Quantity': metrics['math_operations_qty'],
             'Variables Quantity': metrics['variables_qty'],
-            'Max Nested Blocks': metrics['maxNestedBlocks'],
-            'Unique Words Quantity': metrics['uniqueWordsQty']
+            'Max Nested Blocks': max_nested_blocks.get(cls, 0),
+            'Unique Words Quantity': unique_words_qty.get(cls, 0),
+            'Analysis Time (s)': class_times.get(cls,0)
         })
 
     df = pd.DataFrame(data)
@@ -325,6 +334,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Step 1: Clone the repository
+    start_time = time.time()
     clone_repo(git_url, clone_dir)
 
     # Step 2: Run cloc and the analyzer on the cloned directory
@@ -332,4 +342,6 @@ if __name__ == "__main__":
     analyze_metrics_in_directory(clone_dir)
 
     # Step 3: Delete the cloned directory
+    end_time = time.time()
+    print(f"\nExecution time: {end_time - start_time} seconds")
     delete_directory(clone_dir)
